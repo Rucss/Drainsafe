@@ -65,7 +65,7 @@ const Alerts = () => {
   const activeCount = alertsData.filter((alert) => alert.status === "active").length;
   const acknowledgedCount = alertsData.filter((alert) => alert.status === "acknowledged").length;
   const resolvedCount = alertsData.filter((alert) => alert.status === "resolved").length;
-  const todayCount = alertsData.filter((alert) => new Date(alert.created_at).toDateString() === new Date().toDateString()).length;
+  const totalCount = alertsData.length;
   const hasSampleAlerts = alertsData.some((alert) => alert.title.startsWith("Sample:"));
 
   useEffect(() => {
@@ -174,8 +174,8 @@ const Alerts = () => {
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Today</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-primary">{todayCount}</p>
+                    <p className="text-sm font-medium text-muted-foreground">Total Alerts</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-primary">{totalCount}</p>
                   </div>
                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/20 rounded-full flex items-center justify-center">
                     <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />

@@ -4,6 +4,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
@@ -28,13 +29,13 @@ import { getAlerts, getRecentReadings, getSensors } from "@/lib/drainsafe-api";
 
 const Dashboard = () => {
   const [isVisible, setIsVisible] = useState(false);
+  const [selectedSensorId, setSelectedSensorId] = useState<string | null>(null);
   const { data, isPending, error } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const [sensors, readings, alerts] = await Promise.all([
         getSensors(),
-        getRecentReadings(since),
+        getRecentReadings(),
         getAlerts(),
       ]);
       return { sensors, readings, alerts };
@@ -55,7 +56,12 @@ const Dashboard = () => {
   (data?.readings ?? []).forEach((reading) => {
     if (reading.flow_rate === null) return;
     const point = flowPoints.get(reading.recorded_at) ?? {
-      time: new Date(reading.recorded_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      time: new Date(reading.recorded_at).toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     };
     const sensorName = sensorNames.get(reading.sensor_id) ?? "Unknown sensor";
     point[sensorName] = Number(reading.flow_rate);
@@ -68,7 +74,7 @@ const Dashboard = () => {
   const flowColors = ["hsl(var(--primary))", "hsl(var(--secondary))", "hsl(var(--accent))"];
   const latestReadingsBySensor = new Map<string, { sensor_id: string; water_level: number | null }>();
   data?.readings.forEach((reading) => latestReadingsBySensor.set(reading.sensor_id, reading));
-  const levelData = data?.sensors
+  const levelData = (data?.sensors ?? [])
     .map((sensor) => ({
       drain: sensor.name,
       level: latestReadingsBySensor.get(sensor.id)?.water_level,
@@ -93,6 +99,12 @@ const Dashboard = () => {
   const currentSensorAlerts = (data?.alerts ?? [])
     .filter((alert) => alert.sensor_id === currentSensor?.id)
     .slice(0, 5);
+  const selectedSensor = data?.sensors.find((sensor) => sensor.id === selectedSensorId);
+  const selectedSensorReadings = (data?.readings ?? [])
+    .filter((reading) => reading.sensor_id === selectedSensorId)
+    .slice()
+    .reverse()
+    .slice(0, 20);
   const blockageStatus = hasActiveAlert ? "Attention" : hasSampleData ? "Preview" : latestReading ? "Normal" : "No data";
   const flowProgress = Math.min(100, Math.max(0, ((currentFlow ?? 0) / 15) * 100));
   const levelProgress = Math.min(100, Math.max(0, currentLevel ?? 0));
@@ -354,10 +366,18 @@ const Dashboard = () => {
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl font-semibold flex items-center">
                   <TrendingUp className="h-5 w-5 text-primary mr-2" />
-                  Water Flow Rate (24h)
+                  Saved Water Flow Readings
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Latest saved readings; sample values are historical, not live.
+                </p>
+                {flowData.length === 0 && !isPending && (
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    No readings were returned from the database. Run the sample data section in supabase/schema.sql or connect a sensor.
+                  </p>
+                )}
                 <div className="h-48 sm:h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={flowData}>
@@ -398,6 +418,11 @@ const Dashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {levelData.length === 0 && !isPending && (
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    No water-level readings were returned from the database. Run the sample data section in supabase/schema.sql or connect a sensor.
+                  </p>
+                )}
                 <div className="h-48 sm:h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={levelData}>
@@ -419,9 +444,72 @@ const Dashboard = () => {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+                <div className="mt-4 flex flex-wrap gap-2" aria-label="Select a sensor to view its readings">
+                  {(data?.sensors ?? []).map((sensor) => (
+                    <Button
+                      key={sensor.id}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="glass-card border-glass-border"
+                      onClick={() => setSelectedSensorId(sensor.id)}
+                    >
+                      {sensor.name}
+                    </Button>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </div>
+
+          <Dialog
+            open={selectedSensorId !== null}
+            onOpenChange={(open) => {
+              if (!open) setSelectedSensorId(null);
+            }}
+          >
+            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{selectedSensor?.name ?? "Sensor readings"}</DialogTitle>
+                <DialogDescription>
+                  {selectedSensor?.location ?? "Readings saved for this sensor."}
+                </DialogDescription>
+              </DialogHeader>
+              {selectedSensor && (
+                <div className="space-y-4">
+                  {selectedSensor.name.startsWith("Sample Sensor") && (
+                    <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-200">
+                      These are saved sample readings, not live sensor measurements.
+                    </p>
+                  )}
+                  {selectedSensorReadings.length > 0 ? (
+                    <div className="max-h-96 space-y-2 overflow-y-auto">
+                      {selectedSensorReadings.map((reading) => (
+                        <div
+                          key={reading.id}
+                          className="glass-card grid grid-cols-1 gap-2 rounded-lg p-3 text-sm sm:grid-cols-3"
+                        >
+                          <span className="text-muted-foreground">
+                            {new Date(reading.recorded_at).toLocaleString()}
+                          </span>
+                          <span>
+                            Flow: {reading.flow_rate === null ? "—" : `${reading.flow_rate} L/min`}
+                          </span>
+                          <span>
+                            Water level: {reading.water_level === null ? "—" : `${reading.water_level} cm`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No readings are saved for this sensor yet.
+                    </p>
+                  )}
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
 
           {/* Recent Alerts */}
           <Card className="glass-card border-glass-border animate-fade-in" style={{animationDelay: '0.7s'}}>

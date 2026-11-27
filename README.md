@@ -21,7 +21,7 @@ Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local` using the p
 3. Configure the app's Supabase environment variables as above.
 4. Add your local and deployed URLs to Supabase Authentication's redirect URL allow-list. Password reset links return to `/reset-password`.
 
-Row-level security restricts the application tables to authenticated users. All signed-in users currently have the same access to sensor nodes, readings, alerts, and settings. With public sign-ups enabled, anyone who registers can access and modify this project data. Sensor nodes and system settings can be managed in the app. Alerts and readings are stored in Supabase; the dashboard refreshes its data every 30 seconds.
+Row-level security restricts the application tables to authenticated users. All signed-in users currently have the same access to sensor nodes, readings, alerts, and settings. With public sign-ups enabled, anyone who registers can access and modify this project data. Sensor nodes and system settings can be managed in the app. Alerts and readings are stored in Supabase; the dashboard refreshes every 30 seconds and displays the latest 500 stored readings regardless of age.
 
 If an existing project reports `permission denied for table sensor_nodes`, run the updated `supabase/schema.sql` again. It grants the authenticated role the SQL table privileges required in addition to the row-level security policies.
 

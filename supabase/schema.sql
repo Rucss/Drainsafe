@@ -254,3 +254,20 @@ set sensor_id = excluded.sensor_id,
     created_at = excluded.created_at,
     acknowledged_at = excluded.acknowledged_at,
     resolved_at = excluded.resolved_at;
+
+    WITH ordered_readings AS (
+  SELECT
+    id,
+    row_number() OVER (PARTITION BY sensor_id ORDER BY recorded_at, id) AS reading_number,
+    count(*) OVER (PARTITION BY sensor_id) AS reading_count
+  FROM public.sensor_readings
+  WHERE sensor_id IN (
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000002',
+    '00000000-0000-4000-8000-000000000003'
+  )
+)
+UPDATE public.sensor_readings AS readings
+SET recorded_at = now() - ((ordered_readings.reading_count - ordered_readings.reading_number) * interval '30 minutes')
+FROM ordered_readings
+WHERE readings.id = ordered_readings.id;

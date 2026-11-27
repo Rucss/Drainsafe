@@ -46,15 +46,19 @@ export async function deleteSensor(id: string) {
   if (error) throw error;
 }
 
-export async function getRecentReadings(since: string) {
-  const { data, error } = await requireSupabase()
+export async function getRecentReadings(since?: string) {
+  let query = requireSupabase()
     .from("sensor_readings")
     .select("*")
-    .gte("recorded_at", since)
-    .order("recorded_at", { ascending: true });
+    .order("recorded_at", { ascending: false })
+    .limit(500);
+
+  if (since) query = query.gte("recorded_at", since);
+
+  const { data, error } = await query;
 
   if (error) throw error;
-  return data;
+  return data.reverse();
 }
 
 export async function getAlerts() {
